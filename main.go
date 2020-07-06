@@ -146,9 +146,13 @@ func main(){
 
 	fmt.Println("Success")
 
-	mux := http.DefaultServeMux
-
+	go runWithHttp()
+	runWithHttps()
 	
+}
+
+func runWithHttp(){
+	mux := new(http.ServeMux)
 
 	mux.HandleFunc("/get", getuser)
 	mux.HandleFunc("/post", insertuser)
@@ -167,6 +171,24 @@ func main(){
 	}
 
 	server.ListenAndServe()
+}
+
+func runWithHttps(){
+	mux := new(http.ServeMux)
+
+	mux.HandleFunc("/get", getuser)
+	mux.HandleFunc("/post", insertuser)
+	mux.HandleFunc("/update", updateuser)
+	mux.HandleFunc("/delete", deleteuser)
+
+	var handler http.Handler = mux
+
+	handler = middlewareCheckMethod(handler)
+
+
+
+
+	http.ListenAndServeTLS(":"+viper.GetString("server.portTls"),"server.crt","server.key",handler)
 }
 
 func middlewareCheckMethod(next http.Handler) http.Handler{
