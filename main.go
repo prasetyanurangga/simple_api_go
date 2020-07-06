@@ -11,6 +11,7 @@ import(
 	"encoding/json"
 	"strconv"
 	"github.com/spf13/viper"
+	"crypto/tls"
 )
 
 const port string = "9000"
@@ -147,6 +148,7 @@ func main(){
 	fmt.Println("Success")
 
 	go runWithHttp()
+	go runWithHttps2()
 	runWithHttps()
 	
 }
@@ -189,6 +191,55 @@ func runWithHttps(){
 
 
 	http.ListenAndServeTLS(":"+viper.GetString("server.portTls"),"server.crt","server.key",handler)
+}
+
+func runWithHttps2(){
+
+	certPair1, err := tls.LoadX509KeyPair("server.crt", "server.key")
+	if err != nil {
+		log.Fatalln("Failed to start web server", err)
+	}
+
+	tlsConfig := new(tls.Config)
+	tlsConfig.NextProtos = []string{"http/1.1"}
+	tlsConfig.MinVersion = tls.VersionTLS12
+	tlsConfig.PreferServerCipherSuites = true
+
+	tlsConfig.Certificates = []tls.Certificate{
+		certPair1, /** add other certificates here **/
+	}
+	tlsConfig.BuildNameToCertificate()
+
+	tlsConfig.ClientAuth = tls.VerifyClientCertIfGiven
+	tlsConfig.CurvePreferences = []tls.CurveID{
+		tls.CurveP521,
+		tls.CurveP384,
+		tls.CurveP256,
+	}
+	tlsConfig.CipherSuites = []uint16{
+		tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+	}
+
+	mux := new(http.ServeMux)
+
+	mux.HandleFunc("/get", getuser)
+	mux.HandleFunc("/post", insertuser)
+	mux.HandleFunc("/update", updateuser)
+	mux.HandleFunc("/delete", deleteuser)
+
+	var handler http.Handler = mux
+
+	handler = middlewareCheckMethod(handler)
+
+	server := &http.Server{
+		Addr : ":9009",
+		Handler : handler,
+		TLSConfig : tlsConfig,
+	}
+
+	server.ListenAndServeTLS("","")
+
 }
 
 func middlewareCheckMethod(next http.Handler) http.Handler{
