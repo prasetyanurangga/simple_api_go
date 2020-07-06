@@ -10,6 +10,7 @@ import(
 	"context"
 	"encoding/json"
 	"strconv"
+	"github.com/spf13/viper"
 )
 
 const port string = "9000"
@@ -145,14 +146,36 @@ func main(){
 
 	fmt.Println("Success")
 
-	http.HandleFunc("/get", getuser)
-	http.HandleFunc("/post", insertuser)
-	http.HandleFunc("/update", updateuser)
-	http.HandleFunc("/delete", deleteuser)
+	mux := http.DefaultServeMux
+
+	
+
+	mux.HandleFunc("/get", getuser)
+	mux.HandleFunc("/post", insertuser)
+	mux.HandleFunc("/update", updateuser)
+	mux.HandleFunc("/delete", deleteuser)
+
+	var handler http.Handler = mux
+
+	handler = middlewareCheckMethod(handler)
+
+
 
 	server := &http.Server{
-		Addr : ":"+port,
+		Addr : ":"+viper.GetString("server.port"),
+		Handler : handler,
 	}
 
 	server.ListenAndServe()
+}
+
+func middlewareCheckMethod(next http.Handler) http.Handler{
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request){
+			checkMethod := (r.Method == "GET") || (r.Method == "POST")
+			if !checkMethod{
+				w.Write([]byte("Method Harus GET atau POST"))
+			}
+
+			next.ServeHTTP(w,r)
+		})
 }
